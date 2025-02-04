@@ -49,6 +49,7 @@ func main() {
 
 	commands := []models.BotCommand{
 		{Command: "start", Description: "Начать работу с ботом"},
+		{Command: "addnote", Description: "Добавить заметку"},
 		{Command: "help", Description: "Получить справочную информацию"},
 	}
 
@@ -60,6 +61,7 @@ func main() {
 	}
 
 	b.RegisterHandlerMatchFunc(filters.IsStart, handlers.Start)
+	b.RegisterHandlerMatchFunc(filters.IsAdd, handlers.AddNote)
 	b.RegisterHandlerMatchFunc(filters.IsHelp, handlers.Help)
 
 	b.Start(ctx)
