@@ -4,6 +4,8 @@ import (
 	"GoBotRepo/internal/filters"
 	"GoBotRepo/internal/handlers"
 	"GoBotRepo/internal/texts"
+
+	//"GoBotRepo/internal/texts"
 	"GoBotRepo/pkg/database"
 	"GoBotRepo/pkg/systems"
 	"context"
@@ -60,8 +62,12 @@ func main() {
 		panic("Ошибка")
 	}
 
-	b.RegisterHandlerMatchFunc(filters.IsStart, handlers.Start)
-	b.RegisterHandlerMatchFunc(filters.IsAdd, handlers.AddNote)
+	b.RegisterHandlerMatchFunc(filters.IsStart, func(ctx context.Context, bot *bot.Bot, update *models.Update) {
+		handlers.Start(ctx, b, update, DB)
+	})
+	b.RegisterHandlerMatchFunc(filters.IsAdd, func(ctx context.Context, bot *bot.Bot, update *models.Update) {
+		handlers.AddNote(ctx, b, update, DB)
+	})
 	b.RegisterHandlerMatchFunc(filters.IsHelp, handlers.Help)
 
 	b.Start(ctx)

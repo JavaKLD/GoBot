@@ -2,52 +2,81 @@ package handlers
 
 import (
 	"GoBotRepo/internal/texts"
-	"GoBotRepo/pkg/database"
 	"GoBotRepo/pkg/note_model"
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"log"
 	"strings"
 )
 
-func Start(ctx context.Context, b *bot.Bot, update *models.Update) {
+ var userStates = make(map[int64]string)
+
+const AwaitingNoteCont = "awaiting_note_content"
+
+func Start(ctx context.Context, b *bot.Bot, update *models.Update, db *sql.DB) {
+	userId := update.Message.From.ID
+	username := update.Message.From.Username
+
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", userId).Scan(&exists)
+	if err != nil {
+		log.Println("Ошибка проверки пользователя", err)
+		return
+	}
+
+	if !exists {
+		_, err := db.Exec("INSERT INTO users(id, name) VALUES (?, ?)", userId, username)
+		if err != nil {
+			log.Println("Ошибка добавления пользователя", err)
+			return
+		}
+		log.Printf("Добавлен пользователь: ID=%d, UserName=%s", userId, username)
+	}
+
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   texts.Welcome,
 	})
 }
 
-func AddNote(ctx context.Context, b *bot.Bot, update *models.Update) {
+func AddNote(ctx context.Context, b *bot.Bot, update *models.Update, db *sql.DB) {
 	userID := update.Message.Chat.ID
-
 	content := strings.TrimSpace(update.Message.Text)
 
-	if content == "" {
+	if content == "/addnote" {
+		userStates[userID] = AwaitingNoteCont
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: userID,
-			Text: "Для создания заметки, отправьте текс заметки",
+			Text: "Отправьте текст",
 		})
 		return
 	}
 
-	dbModel, err := database.LoadDBModel()
-	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: userID,
-			Text: fmt.Sprintf("Ошибка при подключении к бд %v", err),
-		})
-		return
-	}
-	dbConn := dbModel.GetConn()
+	if state, exists := userStates[userID]; exists && state == AwaitingNoteCont {
+		if content == "" {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: userID,
+				Text: "Заметка не может быть пустой",
+			})
+			return
+		}
+		err := note_model.AddNote(db, userID, content)
+		if err != nil {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: userID,
+				Text: fmt.Sprintf("Ошибка при добавлении заметки: %v", err),
+			})
+			return
+		}
 
-	err = note_model.AddNote(dbConn, userID, content)
-	if err != nil {
+		delete(userStates, userID)
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: userID,
-			Text: fmt.Sprintf("Ошибка при добавлении заметки %v", err),
+			Text: "Заметка добавлена",
 		})
-		return
 	}
 
 	b.SendMessage(ctx, &bot.SendMessageParams{

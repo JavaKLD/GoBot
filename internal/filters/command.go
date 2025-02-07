@@ -1,6 +1,9 @@
 package filters
 
-import "github.com/go-telegram/bot/models"
+import (
+	"github.com/go-telegram/bot/models"
+	"strings"
+)
 
 const (
 	start   = "/start"
@@ -13,7 +16,7 @@ func IsStart(update *models.Update) bool {
 }
 
 func IsAdd(update *models.Update) bool {
-	return update.Message != nil && update.Message.Text == addnote
+	return update.Message != nil && strings.HasPrefix(update.Message.Text, addnote)
 }
 
 func IsHelp(update *models.Update) bool {
